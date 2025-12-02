@@ -1,0 +1,9 @@
+# NTFS Parser MCP Server Dependencies
+
+# MCP SDK
+mcp>=1.0.0
+
+# NTFS Parser dependencies (from parent project)
+construct>=2.10.68      # Binary structure parsing
+tqdm>=4.65.0           # Progress bar
+libewf-python>=20231119  # E01 image support
