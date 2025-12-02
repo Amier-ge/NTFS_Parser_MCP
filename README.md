@@ -1,6 +1,6 @@
 # NTFS Parser MCP Server
 
-NTFS 포렌식 파서를 MCP(Model Context Protocol) 서버로 제공
+NTFS FileSystem Parser를 MCP(Model Context Protocol) 서버로 제공
 
 ## 요구 사항
 
