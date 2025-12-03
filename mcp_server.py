@@ -67,18 +67,7 @@ def parse_usnjrnl(
     output_format: str = "csv",
     mft_path: str | None = None
 ) -> dict[str, Any]:
-    """
-    Parse NTFS $UsnJrnl:$J (USN Journal) file.
 
-    Args:
-        input_path: Path to the $UsnJrnl:$J file
-        output_path: Output file path for results
-        output_format: Output format - csv, json, or sqlite (default: csv)
-        mft_path: Optional path to $MFT file for full path resolution
-
-    Returns:
-        Dictionary with parsing results including record count and elapsed time
-    """
     from src.usnjrnl_parser import parse_usnjrnl as _parse_usnjrnl
 
     if not Path(input_path).exists():
