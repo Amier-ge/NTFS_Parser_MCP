@@ -19,19 +19,13 @@ VERSION = "1.0.0"
 @mcp.tool()
 def parse_mft(
     input_path: str,
-    output_path: str,
-    output_format: str = "csv",
-    active_only: bool = False,
-    include_path: bool = True
+    output_path: str
 ) -> dict[str, Any]:
 
     from src.mft_parser import parse_mft_file, MFTParser
 
     if not Path(input_path).exists():
         return {"success": False, "error": f"Input file not found: {input_path}"}
-
-    if output_format not in ["csv", "json", "sqlite"]:
-        return {"success": False, "error": f"Invalid format: {output_format}. Use csv, json, or sqlite"}
 
     try:
         parser = MFTParser(input_path)
@@ -42,9 +36,9 @@ def parse_mft(
         parse_mft_file(
             input_path,
             output_path,
-            include_deleted=not active_only,
-            output_format=output_format,
-            include_path=include_path
+            include_deleted=True,
+            output_format="json",
+            include_path=True
         )
 
         elapsed = (datetime.now() - start_time).total_seconds()
@@ -53,8 +47,7 @@ def parse_mft(
             "success": True,
             "total_entries": total,
             "elapsed_seconds": elapsed,
-            "output_path": output_path,
-            "format": output_format
+            "output_path": output_path
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -63,21 +56,13 @@ def parse_mft(
 @mcp.tool()
 def parse_usnjrnl(
     input_path: str,
-    output_path: str,
-    output_format: str = "csv",
-    mft_path: str | None = None
+    output_path: str
 ) -> dict[str, Any]:
 
     from src.usnjrnl_parser import parse_usnjrnl as _parse_usnjrnl
 
     if not Path(input_path).exists():
         return {"success": False, "error": f"Input file not found: {input_path}"}
-
-    if mft_path and not Path(mft_path).exists():
-        return {"success": False, "error": f"MFT file not found: {mft_path}"}
-
-    if output_format not in ["csv", "json", "sqlite"]:
-        return {"success": False, "error": f"Invalid format: {output_format}. Use csv, json, or sqlite"}
 
     try:
         file_size = Path(input_path).stat().st_size
@@ -86,9 +71,9 @@ def parse_usnjrnl(
         _parse_usnjrnl(
             input_path,
             output_path,
-            mft_path=mft_path,
-            output_format=output_format,
-            include_path=bool(mft_path)
+            mft_path=None,
+            output_format="json",
+            include_path=False
         )
 
         elapsed = (datetime.now() - start_time).total_seconds()
@@ -97,9 +82,7 @@ def parse_usnjrnl(
             "success": True,
             "file_size_mb": file_size / (1024 * 1024),
             "elapsed_seconds": elapsed,
-            "output_path": output_path,
-            "format": output_format,
-            "path_resolution": bool(mft_path)
+            "output_path": output_path
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -108,8 +91,7 @@ def parse_usnjrnl(
 @mcp.tool()
 def parse_logfile(
     input_path: str,
-    output_path: str,
-    output_format: str = "csv"
+    output_path: str
 ) -> dict[str, Any]:
 
     from src.logfile_parser import parse_logfile as _parse_logfile
@@ -117,21 +99,17 @@ def parse_logfile(
     if not Path(input_path).exists():
         return {"success": False, "error": f"Input file not found: {input_path}"}
 
-    if output_format not in ["csv", "json"]:
-        return {"success": False, "error": f"Invalid format: {output_format}. LogFile supports csv or json only"}
-
     try:
         start_time = datetime.now()
 
-        _parse_logfile(input_path, output_path, output_format=output_format)
+        _parse_logfile(input_path, output_path, output_format="json")
 
         elapsed = (datetime.now() - start_time).total_seconds()
 
         return {
             "success": True,
             "elapsed_seconds": elapsed,
-            "output_path": output_path,
-            "format": output_format
+            "output_path": output_path
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -139,31 +117,23 @@ def parse_logfile(
 
 @mcp.tool()
 def extract_from_image(
-    image_path: str,
-    output_dir: str,
-    partition: int | None = None,
-    verbose: bool = False
+    input_path: str,
+    output_path: str
 ) -> dict[str, Any]:
 
     from src.image_handler import ImageHandler, find_ntfs_partitions, NTFSExtractor
 
-    if not Path(image_path).exists():
-        return {"success": False, "error": f"Image file not found: {image_path}"}
+    if not Path(input_path).exists():
+        return {"success": False, "error": f"Image file not found: {input_path}"}
 
     try:
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        Path(output_path).mkdir(parents=True, exist_ok=True)
 
         results = {"success": True, "partitions": []}
 
-        with ImageHandler(image_path) as image:
+        with ImageHandler(input_path) as image:
             partitions = find_ntfs_partitions(image)
-
-            if partition is not None:
-                if partition < 0 or partition >= len(partitions):
-                    return {"success": False, "error": f"Invalid partition: {partition} (valid: 0-{len(partitions)-1})"}
-                partitions_to_process = [(partition, partitions[partition])]
-            else:
-                partitions_to_process = list(enumerate(partitions))
+            partitions_to_process = list(enumerate(partitions))
 
             for i, part in partitions_to_process:
                 part_result = {
@@ -176,18 +146,18 @@ def extract_from_image(
                 extractor = NTFSExtractor(part)
 
                 # MFT
-                mft_path = Path(output_dir) / f"partition{i}_MFT"
+                mft_path = Path(output_path) / f"partition{i}_MFT"
                 if extractor.extract_mft(str(mft_path)):
                     part_result["extracted"]["mft"] = str(mft_path)
 
                 # LogFile
-                logfile_path = Path(output_dir) / f"partition{i}_LogFile"
+                logfile_path = Path(output_path) / f"partition{i}_LogFile"
                 if extractor.extract_logfile(str(logfile_path)):
                     part_result["extracted"]["logfile"] = str(logfile_path)
 
                 # UsnJrnl
-                usnjrnl_path = Path(output_dir) / f"partition{i}_UsnJrnl_J"
-                if extractor.extract_usnjrnl(str(usnjrnl_path), verbose=verbose):
+                usnjrnl_path = Path(output_path) / f"partition{i}_UsnJrnl_J"
+                if extractor.extract_usnjrnl(str(usnjrnl_path), verbose=False):
                     part_result["extracted"]["usnjrnl"] = str(usnjrnl_path)
 
                 results["partitions"].append(part_result)
@@ -202,171 +172,172 @@ def extract_from_image(
 
 
 @mcp.tool()
-def extract_and_analyze(
-    image_path: str,
-    output_dir: str,
-    output_format: str = "sqlite",
-    partition: int | None = None,
-    skip_mft: bool = False,
-    skip_usnjrnl: bool = False,
-    skip_logfile: bool = False,
-    keep_temp: bool = False
-) -> dict[str, Any]:
+def extract_and_analyze(input_path: str, output_path: str) -> dict[str, Any]:
 
+    import json
+    import tempfile
     from src.image_handler import ImageHandler, find_ntfs_partitions, NTFSExtractor
     from src.mft_parser import parse_mft_file
-    from src.usnjrnl_parser import parse_usnjrnl as _parse_usnjrnl
+    from src.usnjrnl_parser import parse_usnjrnl
     from src.logfile_parser import parse_logfile as _parse_logfile
 
-    if not Path(image_path).exists():
-        return {"success": False, "error": f"Image file not found: {image_path}"}
-
-    if output_format not in ["csv", "json", "sqlite"]:
-        return {"success": False, "error": f"Invalid format: {output_format}"}
+    if not Path(input_path).exists():
+        return {"success": False, "output_path": output_path}
 
     try:
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-        temp_dir = output_path / "temp_extracted"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-
         start_time = datetime.now()
-        results = {"success": True, "partitions": []}
+        Path(output_path).mkdir(parents=True, exist_ok=True)
 
-        with ImageHandler(image_path) as image:
+        results = {"partitions": []}
+
+        with ImageHandler(input_path) as image:
             partitions = find_ntfs_partitions(image)
 
-            if partition is not None:
-                if partition < 0 or partition >= len(partitions):
-                    return {"success": False, "error": f"Invalid partition: {partition}"}
-                partitions_to_process = [(partition, partitions[partition])]
-            else:
-                partitions_to_process = list(enumerate(partitions))
+            for i, part in enumerate(partitions):
+                part_result = {
+                    "partition": i,
+                    "offset": part.offset,
+                    "cluster_size": part.cluster_size,
+                    "output_files": {}
+                }
 
-            ext = '.db' if output_format == 'sqlite' else f'.{output_format}'
-
-            for i, part in partitions_to_process:
-                part_result = {"partition": i, "analyzed": {}}
                 extractor = NTFSExtractor(part)
 
-                mft_temp_path = temp_dir / f"partition{i}_MFT"
+                partition_info = {
+                    "partition_index": i,
+                    "offset": part.offset,
+                    "cluster_size": part.cluster_size
+                }
 
-                # MFT
-                if not skip_mft:
-                    mft_output = output_path / f"partition{i}_MFT{ext}"
-                    if extractor.extract_mft(str(mft_temp_path)):
-                        try:
-                            parse_mft_file(
-                                str(mft_temp_path),
-                                str(mft_output),
-                                include_deleted=True,
-                                output_format=output_format,
-                                include_path=True
-                            )
-                            part_result["analyzed"]["mft"] = str(mft_output)
-                        except Exception as e:
-                            part_result["analyzed"]["mft_error"] = str(e)
+                # MFT 데이터 (별도 파일)
+                mft_data = {
+                    "partition_info": partition_info,
+                    "MFT": []
+                }
 
-                # UsnJrnl
-                if not skip_usnjrnl:
-                    usnjrnl_temp = temp_dir / f"partition{i}_UsnJrnl_J"
-                    usnjrnl_output = output_path / f"partition{i}_UsnJrnl{ext}"
-                    if extractor.extract_usnjrnl(str(usnjrnl_temp)):
-                        try:
-                            mft_for_path = str(mft_temp_path) if (not skip_mft and mft_temp_path.exists()) else None
-                            _parse_usnjrnl(
-                                str(usnjrnl_temp),
-                                str(usnjrnl_output),
-                                mft_path=mft_for_path,
-                                output_format=output_format,
-                                include_path=bool(mft_for_path)
-                            )
-                            part_result["analyzed"]["usnjrnl"] = str(usnjrnl_output)
-                        except Exception as e:
-                            part_result["analyzed"]["usnjrnl_error"] = str(e)
+                # Journal 데이터 (UsnJrnl + LogFile 통합, 별도 파일)
+                journal_data = {
+                    "partition_info": partition_info,
+                    "UsnJrnl": [],
+                    "LogFile": []
+                }
 
-                # LogFile
-                if not skip_logfile:
-                    logfile_temp = temp_dir / f"partition{i}_LogFile"
-                    logfile_format = output_format if output_format != 'sqlite' else 'csv'
-                    logfile_ext = '.csv' if output_format == 'sqlite' else ext
-                    logfile_output = output_path / f"partition{i}_LogFile{logfile_ext}"
-                    if extractor.extract_logfile(str(logfile_temp)):
+                # 임시 디렉토리 사용
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    temp_path = Path(temp_dir)
+
+                    # MFT 추출 및 파싱
+                    mft_raw = temp_path / "MFT"
+                    mft_json = temp_path / "MFT.json"
+                    if extractor.extract_mft(str(mft_raw)):
                         try:
-                            _parse_logfile(str(logfile_temp), str(logfile_output), output_format=logfile_format)
-                            part_result["analyzed"]["logfile"] = str(logfile_output)
+                            parse_mft_file(str(mft_raw), str(mft_json), include_deleted=True, output_format="json", include_path=True)
+                            with open(mft_json, "r", encoding="utf-8") as f:
+                                mft_data["MFT"] = json.load(f)
                         except Exception as e:
-                            part_result["analyzed"]["logfile_error"] = str(e)
+                            mft_data["MFT"] = {"error": str(e)}
+
+                    # LogFile 추출 및 파싱
+                    logfile_raw = temp_path / "LogFile"
+                    logfile_json = temp_path / "LogFile.json"
+                    if extractor.extract_logfile(str(logfile_raw)):
+                        try:
+                            _parse_logfile(str(logfile_raw), str(logfile_json), output_format="json")
+                            with open(logfile_json, "r", encoding="utf-8") as f:
+                                journal_data["LogFile"] = json.load(f)
+                        except Exception as e:
+                            journal_data["LogFile"] = {"error": str(e)}
+
+                    # UsnJrnl 추출 및 파싱
+                    usnjrnl_raw = temp_path / "UsnJrnl_J"
+                    usnjrnl_json = temp_path / "UsnJrnl.json"
+                    if extractor.extract_usnjrnl(str(usnjrnl_raw), verbose=False):
+                        try:
+                            parse_usnjrnl(str(usnjrnl_raw), str(usnjrnl_json), mft_path=None, output_format="json", include_path=False)
+                            with open(usnjrnl_json, "r", encoding="utf-8") as f:
+                                journal_data["UsnJrnl"] = json.load(f)
+                        except Exception as e:
+                            journal_data["UsnJrnl"] = {"error": str(e)}
+
+                # MFT JSON 파일 저장
+                mft_json_path = Path(output_path) / f"partition{i}_mft.json"
+                with open(mft_json_path, "w", encoding="utf-8") as f:
+                    json.dump(mft_data, f, ensure_ascii=False, indent=2)
+                part_result["output_files"]["mft"] = str(mft_json_path)
+
+                # Journal (UsnJrnl + LogFile) JSON 파일 저장
+                journal_json_path = Path(output_path) / f"partition{i}_journal.json"
+                with open(journal_json_path, "w", encoding="utf-8") as f:
+                    json.dump(journal_data, f, ensure_ascii=False, indent=2)
+                part_result["output_files"]["journal"] = str(journal_json_path)
 
                 results["partitions"].append(part_result)
 
-        # 임시 파일 정리
-        if not keep_temp:
-            import shutil
-            try:
-                shutil.rmtree(temp_dir)
-                results["temp_cleaned"] = True
-            except Exception:
-                results["temp_cleaned"] = False
+        results["elapsed_seconds"] = (datetime.now() - start_time).total_seconds()
+        results["total_partitions"] = len(results["partitions"])
+        results["input_path"] = input_path
+        results["output_path"] = output_path
 
-        elapsed = (datetime.now() - start_time).total_seconds()
-        results["elapsed_seconds"] = elapsed
-        results["output_dir"] = str(output_path)
-
-        return results
+        return {"success": True, "output_path": output_path}
 
     except ImportError as e:
-        return {"success": False, "error": f"Missing dependency: {e}"}
+        return {"success": False, "output_path": output_path}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "output_path": output_path}
 
 
 @mcp.tool()
-def analyze_artifacts(
-    output_dir: str,
-    output_format: str = "csv",
-    mft_path: str | None = None,
-    usnjrnl_path: str | None = None,
-    logfile_path: str | None = None
+def search_keyword(
+    json_path: str,
+    keyword: str
 ) -> dict[str, Any]:
 
-    from src.analyzer import UnifiedAnalyzer
+    import json
 
-    if not any([mft_path, usnjrnl_path, logfile_path]):
-        return {"success": False, "error": "At least one input file required (mft_path, usnjrnl_path, or logfile_path)"}
+    if not Path(json_path).exists():
+        return {"success": False, "error": f"JSON file not found: {json_path}"}
 
-    # 파일 존재 확인
-    for path, name in [(mft_path, "MFT"), (usnjrnl_path, "UsnJrnl"), (logfile_path, "LogFile")]:
-        if path and not Path(path).exists():
-            return {"success": False, "error": f"{name} file not found: {path}"}
-
-    if output_format not in ["csv", "json", "sqlite"]:
-        return {"success": False, "error": f"Invalid format: {output_format}"}
+    def contains_keyword(obj: Any, keyword: str) -> bool:
+        if isinstance(obj, str):
+            return keyword.lower() in obj.lower()
+        elif isinstance(obj, dict):
+            return any(contains_keyword(v, keyword) for v in obj.values())
+        elif isinstance(obj, list):
+            return any(contains_keyword(item, keyword) for item in obj)
+        return False
 
     try:
         start_time = datetime.now()
 
-        analyzer = UnifiedAnalyzer(output_dir)
-        result_path = analyzer.analyze_all(
-            mft_path=mft_path,
-            logfile_path=logfile_path,
-            usnjrnl_path=usnjrnl_path,
-            output_format=output_format
-        )
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        matches = []
+
+        if isinstance(data, list):
+            for record in data:
+                if contains_keyword(record, keyword):
+                    matches.append(record)
+        elif isinstance(data, dict):
+            for key in ["UsnJrnl", "LogFile", "MFT"]:
+                if key in data and isinstance(data[key], list):
+                    for record in data[key]:
+                        if contains_keyword(record, keyword):
+                            matches.append(record)
 
         elapsed = (datetime.now() - start_time).total_seconds()
 
         return {
             "success": True,
+            "keyword": keyword,
+            "json_path": json_path,
+            "total_matches": len(matches),
             "elapsed_seconds": elapsed,
-            "output_path": result_path,
-            "format": output_format,
-            "inputs": {
-                "mft": mft_path,
-                "usnjrnl": usnjrnl_path,
-                "logfile": logfile_path
-            }
+            "matches": matches
         }
+
+    except json.JSONDecodeError as e:
+        return {"success": False, "error": f"Invalid JSON file: {e}"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -385,7 +356,7 @@ def get_info() -> dict[str, Any]:
             "parse_logfile - Parse $LogFile (Transaction Log)",
             "extract_from_image - Extract artifacts from E01/RAW disk images",
             "extract_and_analyze - One-step extraction and analysis",
-            "analyze_artifacts - Unified analysis of multiple artifacts"
+            "search_keyword - Search keyword in parsed JSON files"
         ],
         "supported_formats": ["csv", "json", "sqlite"],
         "supported_images": ["E01", "RAW"],
