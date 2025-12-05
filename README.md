@@ -65,8 +65,9 @@ python mcp_server.py
 | `parse_usnjrnl` | $UsnJrnl:$J (USN Journal) 파싱 |
 | `parse_logfile` | $LogFile (Transaction Log) 파싱 |
 | `extract_from_image` | 디스크 이미지에서 아티팩트 추출 |
-| `extract_and_analyze` | 추출 + 분석 한번에 |
+| `extract_and_analyze` | 추출 + 분석 |
 | `analyze_artifacts` | 여러 아티팩트 통합 분석 |
+| `search_keyword` | 특정 키워드 검색 |
 | `get_info` | 도구 정보 조회 |
 
 ## 출력 형식
